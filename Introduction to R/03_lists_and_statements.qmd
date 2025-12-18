@@ -1,0 +1,381 @@
+---
+title: "R Programming: Functions & Data Structures"
+subtitle: "Lists, Vectors, Custom Functions, and More"
+author: "İsmail İbican"
+date: "`r Sys.Date()`"
+format: 
+  html:
+    theme: cosmo         # Modern, clean theme
+    toc: true            # Show table of contents
+    toc-location: left   # Put TOC on the left
+    code-fold: true      # Allow folding of code chunks
+    code-tools: true     # Add run buttons for code chunks
+    number-sections: true
+    fig-width: 7         # Default figure width
+    fig-height: 5        # Default figure height
+editor: visual
+fontsize: 12pt
+link-citations: true
+---
+
+## Lists :
+
+> A list is a **data structure** that can be used to store **different kinds** of data
+
+-   Recall: a vector is a data structure for storing *similar kinds of data*
+
+-   To better understand the difference, consider the following example.
+
+------------------------------------------------------------------------
+
+```{r}
+my.vector.1 <- c("Ela", 22, FALSE) # (name, weight, is.male)
+my.vector.1 
+```
+
+```{r}
+typeof(my.vector.1)  
+```
+
+> There is slightly difference between list and vector. Vector must store same data types while list does not. If there is different data types in vector it turns them the general data type "character"
+>
+> And also there is a hierarchy for R (Logical -\> Integer -\> Double -\> Character
+
+------------------------------------------------------------------------
+
+```{r}
+my.vector.2 <- c(FALSE, TRUE, 1) # (is.male, is.baby, age)
+typeof(my.vector.2)
+```
+
+------------------------------------------------------------------------
+
+-   Vectors expect elements to be all of the same type (e.g., `Boolean`, `numeric`, `character`)
+
+-   When data of different types are put into a vector, the R converts everything to a common type
+
+-   To store data of different types in the same object, we use lists
+
+-   Simple way to build lists: use `list()` function
+
+------------------------------------------------------------------------
+
+```{r}
+my.list <- list("Ela", 22, TRUE)
+my.list
+```
+
+------------------------------------------------------------------------
+
+```{r}
+sapply(my.list, typeof)
+```
+
+------------------------------------------------------------------------
+
+```{r}
+kid.1 <- list(name="Ela", weight=22, is.male=FALSE)
+kid.1
+```
+
+------------------------------------------------------------------------
+
+```{r}
+kid.1$name # Get "name" element (returns a string)
+```
+
+------------------------------------------------------------------------
+
+```{r}
+kid.1[["name"]] # Get "name" element (returns a string)
+```
+
+------------------------------------------------------------------------
+
+```{r}
+kid.1["name"] # Get "name" slice (returns a sub-list)
+```
+
+------------------------------------------------------------------------
+
+```{r}
+c(typeof(kid.1$name), typeof(kid.1["name"]))
+```
+
+------------------------------------------------------------------------
+
+-   An important part of programming and data analysis is to write custom functions
+
+-   Functions help make code **modular**
+
+-   Functions make debugging easier
+
+-   Remember: this entire class is about applying *functions* to *data*
+
+> A function is a machine that turns **input objects** (arguments) into an **output object** (return value) according to a definite rule.
+
+------------------------------------------------------------------------
+
+```{r}
+addOne <- function(x) {
+  x + 1
+}
+```
+
+> -   `x` is the **argument** or **input**
+>
+> -   The function **output** is the input `x` incremented by 1
+
+------------------------------------------------------------------------
+
+```{r}
+addOne(12)
+```
+
+------------------------------------------------------------------------
+
+Here’s a function that returns a % given a numerator, denominator, and desired number of decimal values
+
+------------------------------------------------------------------------
+
+```{r}
+calculatePercentage <- function(x, y, d) {
+  decimal <- x / y  # Calculate decimal value
+  round(100 * decimal, d)  # Convert to % and round to d digits
+}
+
+calculatePercentage(27, 80, 1)
+```
+
+------------------------------------------------------------------------
+
+> -   If you’re calculating several %’s for your report, you should use this kind of function instead of repeatedly copying and pasting code
+>
+> Function returning a list - Here’s a function that takes a person’s full name (FirstName LastName), weight in lb and height in inches and converts it into a list with the person’s first name, person’s last name, weight in kg, height in m, and BMI.
+
+------------------------------------------------------------------------
+
+```{r}
+createPatientRecord <- function(full.name, weight, height) {
+  name.list <- strsplit(full.name, split=" ")[[1]]
+  first.name <- name.list[1]
+  last.name <- name.list[2]
+  weight.in.kg <- weight / 2.2
+  height.in.m <- height * 0.0254
+  bmi <- weight.in.kg / (height.in.m ^ 2)
+  list(first.name=first.name, last.name=last.name, weight=weight.in.kg, height=height.in.m,
+       bmi=bmi)
+}
+```
+
+------------------------------------------------------------------------
+
+> Trying out the function
+
+------------------------------------------------------------------------
+
+```{r}
+createPatientRecord("Ahmet CAN", 185, 12 * 6 + 1)
+```
+
+------------------------------------------------------------------------
+
+> Another example: 5 number summary - Calculate mean, 10% trimmed mean, median, geometric and harmonic means of a random variable
+
+------------------------------------------------------------------------
+
+```{r}
+fiveaverages <- function(x) {
+  c(average=mean(x), trimmed=mean(x, trim=0.10), median=median(x), geometricmean= prod(x)^(1/length(x)), harmonicmean= 1/mean(1/x))
+}
+x <- rnorm(200, mean=20, sd=5) # Vector of 200 kids with weight mean 5 and weight sd 2
+par(mfrow=c(1,3))
+hist(x)
+qqnorm(x)
+qqline(x)
+boxplot(x)
+```
+
+------------------------------------------------------------------------
+
+```{r}
+fiveaverages(x)
+```
+
+------------------------------------------------------------------------
+
+```{r}
+x <- c(rnorm(180, mean=20, sd=5),rnorm(20, mean=50, sd=5)) # Vector of 200 kids with outliers
+par(mfrow=c(1,3))
+hist(x)
+qqnorm(x)
+qqline(x)
+boxplot(x)
+```
+
+------------------------------------------------------------------------
+
+```{r}
+fiveaverages(x)
+```
+
+# If-Else Statements :
+
+> -   Oftentimes we want our code to have different effects depending on the features of the input
+>
+> -   Example: Calculating a student’s letter grade
+>
+>     -   If grade \>= 90, assign A
+>
+>     -   Otherwise, if grade \>= 80, assign B
+>
+>     -   Otherwise, if grade \>= 70, assign C
+>
+>     -   In all other cases, assign F
+>
+> -   To code this up, we use if-else statements
+>
+> f-else Example: Letter grades
+
+```{r}
+calculateLetterGrade <- function(x) {
+  if(x >= 90) {
+    grade <- "A"
+  } else if(x >= 80) {
+    grade <- "B"
+  } else if(x >= 70) {
+    grade <- "C"
+  } else {
+    grade <- "F"
+  }
+  grade
+}
+
+course.grades <- c(92, 78, 87, 91, 62)
+sapply(course.grades, FUN=calculateLetterGrade)
+```
+
+> `return()`
+>
+> -   In the previous examples we specified the output simply by writing the output variable as the last line of the function
+>
+> -   More explicitly, we can use the `return()` function
+
+------------------------------------------------------------------------
+
+```{r}
+addOne <- function(x) {
+  return(x + 1)
+}
+
+addOne(12)
+```
+
+------------------------------------------------------------------------
+
+-   We will generally avoid the `return()` function, but you can use it if necessary or if it makes writing a particular function easier.
+
+###Write your own function for Median Absolute Deviation
+
+```{r}
+MADcalculator <- function(x) {
+  summation <- 0
+  med <- median(x)
+  for (i in x) {
+    summation <- sum(abs(i - med))
+  }
+  return(summation/length(x))
+}
+x <- c(54, 87, 16, 19)
+
+print(MADcalculator(x))
+```
+
+------------------------------------------------------------------------
+
+```{r}
+# Load the necessary library
+library(ggplot2)
+
+# Define the analysis function
+CorrelationAnalyzer <- function(x, y) {
+  # Calculate Pearson correlation
+  correlation <- cor(x, y, method = "pearson")
+  
+  # Determine the strength of the correlation
+  abs_cor <- abs(correlation)
+  if (abs_cor >= 0.8) {
+    power <- "Very Strong"
+  } else if (abs_cor >= 0.6) {
+    power <- "Strong"
+  } else if (abs_cor >= 0.4) {
+    power <- "Moderate"
+  } else if (abs_cor >= 0.2) {
+    power <- "Weak"
+  } else {
+    power <- "Very Weak"
+  }
+  
+  # Return a list containing the results
+  return(list(correlation = correlation, power = power))
+}
+
+# --- Create the Plot ---
+
+# 1. Use the mtcars dataset and run your function
+data(mtcars)
+analysis_results <- CorrelationAnalyzer(mtcars$wt, mtcars$mpg)
+
+# 2. Create a dynamic subtitle string using the results
+plot_subtitle <- paste("Correlation:", round(analysis_results$correlation, 2),
+                       " (", analysis_results$power, ")", sep = "")
+
+# 3. Create the ggplot
+ggplot(mtcars, aes(x = wt, y = mpg)) +
+  geom_point(color = "steelblue", size = 3, alpha = 0.8) +
+  geom_smooth(method = "lm", se = TRUE, color = "tomato") +
+  labs(
+    title = "Relationship between Car Weight and MPG",
+    subtitle = plot_subtitle,
+    x = "Weight (1000 lbs)",
+    y = "Miles Per Gallon (MPG)"
+  ) +
+  theme_minimal()
+
+```
+
+```{r}
+MissingValueReplacer <- function(x, y) {
+  
+  #Check inputs to be numeric type first.
+  if (!is.numeric(x)) {
+    stop("x must be a numeric vector.")
+  }
+  
+  #Boundary check for y values
+  if (!is.numeric(y) || y < 0 || y > 0.5) {
+    stop("y must be a number between 0 and 0.5 (proportion to trim).")
+  }
+  
+  #Calculate the trimmed mean (ignore missing values)
+  trimmed_mean <- mean(x, trim = y, na.rm = TRUE)
+  
+  #Count missing values
+  missing_count <- sum(is.na(x))
+  
+  #Replace missing values
+  x[is.na(x)] <- trimmed_mean
+  
+  #Print info
+  cat("Trimmed proportion:", y, "\n")
+  cat("Trimmed mean:", round(trimmed_mean, 3), "\n")
+  cat("Missing values replaced:", missing_count, "\n")
+  
+  #Return cleaned vector
+  return(x)
+}
+
+#Set some values to test the function
+data <- c(2, 5, 8, 10, 12, 15, 20, NA, 25, 30, NA)
+MissingValueReplacer(data,0.1)
+```

@@ -1,0 +1,347 @@
+---
+title: "Hypothesis Testing in R"
+subtitle: "Z-test and T-test"
+author: "Ismail Ibican"
+date: "last-modified"
+date-format: "DD MMMM YYYY"
+description: "This document explains how to apply hyptohesis test on R  "
+
+format:
+  html:
+    lang: en
+    embed-resources: true
+    smooth-scroll: true
+    link-external-newwindow: true
+
+    theme:
+      light: zephyr
+      dark: darkly
+
+    toc: true
+    toc-location: left
+    toc-title: "Table of Contents"
+    toc-depth: 3
+    toc-expand: true
+    number-sections: true
+
+    code-fold: true
+    code-summary: "Show/Hide Code"
+    code-copy: true
+    code-overflow: scroll
+    
+    grid:
+      body-width: 1000px
+      margin-width: 300px
+      
+    callout-appearance: minimal
+---
+
+## PDF 4-Z-Scores :
+
+> A standardized value that measures how many standart deviations a data point is from the mean of its dataset
+>
+> And also we can calculate z-score with automatically in R
+
+```{r}
+grades <- c(70,80,75,60,90,65,75,85,50)
+
+z_scores_automatically <- scale(grades)
+
+print(z_scores_automatically)
+
+# Or we can do it manually : 
+average <- mean(grades)
+print(paste("Average : ", average))
+
+standart_deviation <- sd(grades)
+
+print(paste("Standart Deviation : "), standart_deviation)
+
+z_scores_manually <- (grades - average) / standart_deviation
+
+print("Z-scores Manually : ")
+print(z_scores_manually)
+```
+
+# Normal Probability Distribution :
+
+```{r}
+par(mfrow = c(1,2))
+
+# Normally Distirbuted Data
+
+set.seed(42)
+normal_data <- rnorm(n = 200, mean = 100, sd = 15)
+
+# Draw the graph 
+hist(normal_data, main = "Normal Data Histogram")
+
+# Normal Probablity Plot
+
+qqnorm(normal_data, main = "Normal Data(qqplot)")
+qqline(normal_data, col = "red", lwd = 2)
+
+# Skewed Data Part :
+
+set.seed(42)
+
+skewed_data <- rlnorm(n = 200, meanlog = 0, sdlog = 1)
+
+# Draw Plot
+hist(skewed_data, main= "Skewed Data Histogram")
+
+# Normal Probability Plot
+qqnorm(skewed_data, main="Skewed Data (qqplot)")
+qqline(skewed_data, col = "red", lwd = 2)
+
+par(mfrow = c(1,1))
+```
+
+# Hypothesis Testing :
+
+> There is 3 types of hypothesis testing :
+
+-   One-sample t-test : Purpose of one-sample t-test is comparing the mean of a single group against a known value
+
+-   Independent Two-sample t-test :
+
+-   Purpose of independent two-sample t-test is comparing the means of two independent groups
+
+-   Paired(Dependent) t-test :
+
+-   Purpose of this test is comparing the means of two related groups
+
+> Let's get into some examples
+>
+> Here is the one-variable t-test
+
+```{r}
+fix_time <- c(25, 41, 41, 54, 29, 50, 54, 46, 54, 
+              33, 33, 54, 37, 12, 29, 41)
+
+# Ho: mu = 30 (Null hypothesis) -> Average fixing time is 30 mins
+
+# Ha: mu != 30 (alternative hypothesis) -> Average fixing time is not 30 mins
+
+# These 2 lines are our hypothesis
+
+mean(fix_time)
+sd(fix_time)
+
+# We calculated mean and sd values for preparing to testing step
+
+shapiro.test(fix_time) # -> p-value = 0.21 that means h0 is accepted
+
+# We applied shaprio test to check out normal distribution is exist.
+
+# If p-value > 0.05 Ho is accepted
+
+# Otherwise Ho is rejected 
+
+t.test(fix_time, mu = 30, alternative = "two.sided",conf.level = 0.95)
+
+# It makes t.test over our hypothesis(we will find alpha and real p-value)
+
+U = qt(0.95, df = 15)
+
+# At all we get p-value = 0.007 
+
+# t = 3.10 
+
+# That means p-value < 0.05 so that H0 is rejected
+```
+
+> Here is the Independent two-sample t-test :
+
+```{r}
+remote <- c(25, 41, 41, 54, 29, 50, 54, 46, 54, 33, 33, 54, 37, 12, 29, 41)
+
+office <- c(41, 66, 92, 71, 71, 54, 88, 54, 
+            70, 50, 58, 79, 88, 46, 67, 46)
+
+# H0 = mu_remote = mu_office
+# Ha = mu_remote != mu_office
+
+# First of all we must apply shapiro test for every vector
+
+shapiro.test(remote)
+shapiro.test(office)
+
+# We must use variance test as well because there is 2 independent sample that we have it is not enough the tell something about p-value with using shapiro-wilk normality test 
+
+var.test(remote, office)
+
+# We call var.test also as F-test
+
+# After applying variance homogenity test we claimed that h0 = variance^2 = variance^2 
+
+# And also if p-value > 0.05 their square of variance are equal each other
+
+# At all we will find another p-value 
+
+# After using this test we must declare it on t.test() function as var.equal = TRUE
+
+t.test(remote, office, 
+       alternative = "two.sided",
+       var.equal = TRUE,
+       paired = FALSE,
+       conf.level = 0.95)
+
+U = qt(0.95, df = 30)
+
+```
+
+> Here is the Paired(Dependent) t-test :
+
+```{r}
+morning <- c(25, 41, 41, 54, 29, 50, 54, 46, 54, 
+             33, 33, 54, 37, 12, 29, 41)
+afternoon <- c(41, 66, 92, 71, 71, 54, 88, 54, 
+               70, 50, 58, 79, 88, 46, 67, 46)
+
+# As you can see that there is the 2 dependent variable
+
+# On this test we look their difference for p-value
+
+d <- morning - afternoon
+shapiro.test(d)
+
+t.test(morning, afternoon,
+       paired = TRUE,
+       alternative = "two.sided",
+       conf.level = 0.95)
+
+U = qt(0.95, df = 15)
+```
+
+> Now there is the features of all functions and how they works :
+
+> For one-sample t-test :
+
+-   First of all we declared a sample that we want to create a hypothesis
+
+-   Then we calculate their mean and standart deviation values to understand what is going on better
+
+-   Then we make Shapiro-Wilk normality test to check is there any normal distribution for these hypothesis if p-value is greater then 0.05(default value) it is normally distributed. Otherwise it is not normally distributed and our H0 hypothesis is rejected.
+
+-   Then second step is creating a t-test with t.test() function.
+
+-   Here is the parameters of t.test() function -\> (dataFrame, mu\[mean value of any work\], paired = , alternative = , conf.level =,
+
+-   Alternative is changing value to check it we have to ask something affected our sample is negatively or positively.
+
+-   Paired is just takes TRUE in paired two-sample t-test
+
+-   mu is declared by ourselves
+
+-   conf.level is about our alpha value. We must declare an alpha value to declare confidence level. As a default alpha value is equal to 0.05
+
+-   As a last step we are finding U for t-test to finish our last checks if hypothesis is rejected or not rejected
+
+> Now we will talk about Independent 2-sample t-test() :
+
+-   Now we have 2 independent vector.
+
+-   Now we are checking our hypothesis as their mean values are equal or not.
+
+-   As a second step we are applying Shapiro-Wilk normality test
+
+-   Here is the critical part this shapiro-wilk normality test is not enough to declare our hypothesis is rejected or is not rejected so that we are using variance homogenity test or known as F-test
+
+-   If it is not rejected in F-test we must declare var.equal = TRUE in t.test() function
+
+-   We can make this test with using var.test(v1,v2)
+
+-   We are checking their variance ratio
+
+-   H0 says that their variance in this confidence interval is equal.Ha says that they are not equal
+
+-   There is an additional part for t.test() function, we are just adding var.equal = TRUE parameter
+
+-   As a last step again we are demonstrating U value (Critical t-value)
+
+> Here is the Paired(Dependent) t-test() :
+
+-   Again we have 2 vector but they are dependent. If something affects on one vector the other one will be effected
+
+-   We are looking their mean differences for the hypothesis
+
+-   d \<- v1 - v2 is means that
+
+-   And again we are applying Shapiro-Wilk normality test
+
+-   An additional part for t.test() parameter is paired = TRUE
+
+-   Again we are finding critical t-value as a last step
+
+> NOTE : There is 3 type of alternative parameter -\> "two.sided", "less", "greater". If you see that if it is affected in negatively you will use "less", If you see that if it is affected in positively, You will use "greater"
+
+# ANOVA(Analysis of Variance)
+
+> Compare 3 or more groups mean
+>
+> There is 2 type of hypothesis for ***ANOVA***
+
+-   H0 : mu1 = mu2 = mu3 =...
+
+-   Ha : At least one group is different mean
+
+-   We can't find which group is different with looking into Ha directly
+
+-   Main purpose is separating variance into groups
+
+-   2 type of separating ways :
+
+-   Between groups and Within groups
+
+-   Between Groups : How much difference between groups variance mean
+
+-   Within Groups : How much difference between each member of groups variance mean
+
+> Let's check it out on an example :
+
+```{r}
+remote <- c(25, 41, 41, 54, 29, 50, 54, 46, 54, 33, 33, 54, 37, 12, 29, 41)
+office <- c(41, 66, 92, 71, 71, 54, 88, 54, 70, 50, 58, 79, 88, 46, 67, 46)
+hybrid <- c(35, 50, 55, 60, 45, 52, 58, 50, 55, 48, 49, 57, 53, 42, 50, 51)
+
+# We must create a single data frame before starting testing
+
+# In short, Combine into one vector and create a group factor
+
+values <- c(remote, office, hybrid)
+group <- factor(rep(c("Remote","Office","Hybrid"), each = 16))
+
+data_df <- data.frame(values,group)
+
+# rep() function repeats this statement for each = variable there is 16 elements in every single vector so that we have to repeat all of them to group them as one factor
+
+# Then we are making Shapiro-Wilk normality test : 
+
+shapiro.test(remote)
+shapiro.test(office)
+shapiro.test(hybrid)
+
+# Second step is checking Variance Homogeneity Test (Bartlett Test)
+
+bartlett.test(values ~ group, data = data_df) # Gerek yok 
+
+# ANOVA test : 
+
+anova_result <- aov(values ~ group, data = data_df)
+
+summary(anova_result)
+
+# Post-hoc Test(Tukey)
+
+TukeyHSD(anova_result)
+
+# Visualization 
+
+library(ggplot2)
+
+vis.plot <-ggplot(data_df, aes(x = group, y = values, fill = group)) 
+
+vis.plot + geom_boxplot() + labs(title = "Code Commits by Work Type", y = "Weekly Commits",x = "Work Type")
+theme_minimal()
+```

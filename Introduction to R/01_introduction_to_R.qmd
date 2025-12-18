@@ -1,0 +1,337 @@
+---
+title: "Practice R"
+author: "Ismail Ibican"
+date: today
+format:
+  html:
+    lang: en
+    theme: journal
+    toc: true
+    toc-location: left
+    toc-title: "Table of Contents"
+    code-fold: true
+    code-summary: "Show/Hide Code"
+    code-copy: true
+    code-overflow: scroll
+    grid:
+      body-width: 1100px
+---
+
+> R is vector based language.
+
+```{r}
+x <- c(10,20,30)
+x + 1 # It will increase all values by 1
+
+# Output -> 11,21,31
+```
+
+> C() -\> This vector function holds the value together. After taking values in c() it means they all related between each other
+
+# 1.Logical Filter
+
+```{r}
+x[x>15] # It is a logical filter
+
+# As you can see we first defined which vector we used than we specified the logical filter
+```
+
+------------------------------------------------------------------------
+
+# 2.Finding Mean
+
+```{r}
+mean(x)# It is a basic function to get mean value of a vector 
+```
+
+## 2.1Objects and Types
+
+> There is some type that we use in R language :
+
+-   Numeric -\> 3.14
+
+-   Integer -\> 1L
+
+-   Character -\> "text"
+
+-   Logical -\> True, False
+
+> There is a cruical part :
+
+-   Factor : Categorical labels stored with levels
+
+> Factor is a definer for statistical variables. It helps us to define which variables are related between each other by their types etc...
+
+```{r}
+typeof(3.14);
+typeof(TRUE)
+
+is.factor(factor(c("A", "B")))
+```
+
+## 2.2Based Indexing :
+
+```{r}
+v <- c(5,6,7,8)
+v[1] # It means that take the first element of the vector "v" (First element is not zero!)
+```
+
+```{r}
+v[c(2,4)] # It says go the vector "v" then take the vector of 2,4 (It means take the 2nd and 4th elements of vector )
+
+# Output will be 6,8
+```
+
+```{r}
+v[-1] # All but without first element 
+
+# Output : 6,7,8
+```
+
+## 2.3Missing Values : NA
+
+> Comparisons with NA return NA(Unknown) use "is.na()" to find is there any NA value
+
+```{r}
+z <- c(1,NA,3)
+
+z > 2 # Logical operation over the all vector
+# NA where unknown 
+# Output : FALSE , NA , TRUE
+```
+
+```{r}
+is.na(z) # Checks is there any NA values in vector "z"
+```
+
+> na.rm -\> Means NA REMOVE FUNCTION
+
+```{r}
+mean(z, na.rm = TRUE) 
+# We removed all NA values from vector "z" then we take of mean of z
+
+# OUTPUT : 2
+```
+
+## 2.4Functions and the base pipe \|\>
+
+```{r}
+add_one <- function(a) a +1
+c(1,2,3) |> add_one()|> mean()
+
+# Pipe operator assigns left hand sided value to right hand side 
+
+# First line we created a function with its condition then we created a vector with pipe, We assigned this vector one by one 
+
+# OUTPUT : 3
+```
+
+# 3. Read a CSV and inspect
+
+```{r}
+stud <- readr::read_csv("C:/Users/Karsaya/Desktop/practice 1_files/student_mini.csv", show_col_types = FALSE)
+
+dplyr::glimpse(stud)     # structure & column types
+```
+
+> Here is a information about readr:: \# 2 Column means that take some information from this packet!
+
+> And also with using show_col_types we avoid to see column types!
+
+> At the last part dplyr:: says that use "dplyr" packet. (It's a packet for data manipulation from Tidyverse)!
+
+> And also glimpse is a packet to check data frames!
+
+```{r}
+head(stud,3)
+```
+
+# 4. Cleaning with dplyr — Core Verbs
+
+## 4.1 Select And Rename
+
+```{r}
+stud_small <- stud |>
+  dplyr::select(student_id, full_name = name, program, gpa, credits)
+
+names(stud_small)
+```
+
+> We did this operation at this code block :
+
+> We selected student_id, name,program,gpa, credits columns but while assigning all columns we changed name column with full_name
+
+## 4.2 Filter and Sort
+
+```{r}
+high_gpa <- stud_small |> 
+  dplyr::filter(gpa >= 3.2) |> dplyr::arrange(dplyr::desc(gpa))
+
+high_gpa
+
+```
+
+> As you can see that for every manipulation method is called with dplyr:: !
+
+## 4.3 Create new columns with mutate()
+
+```{r}
+stud_aug <- stud_small |>
+  dplyr::mutate(
+    honors = gpa >= 3.5,                            # TRUE/FALSE flag
+    gpa_band = dplyr::case_when(                    # binning
+      gpa >= 3.5 ~ "High",
+      gpa >= 3.0 ~ "Mid",
+      TRUE       ~ "Low"
+    ),
+    credit_band = cut(credits, c(0,110,130,Inf),
+                      labels = c("<=110","111-130",">130"))
+  )
+
+dplyr::count(stud_aug, gpa_band)
+```
+
+> We created a column called as "credit_band" the we cutted some specified intervals with cut() function. First we declared the column we wanted to use then we specified a vector for cutting which intervals. Then we labeled to our rows!
+
+## 4.4 Grouped Summaries
+
+```{r}
+by_prog <- stud_aug |>
+  dplyr::group_by(program, gpa_band) |>
+  dplyr::summarise(
+    n = dplyr::n(),
+    gpa_mean = mean(gpa, na.rm = TRUE),
+    .groups = "drop"
+  ) |>
+  dplyr::arrange(program, dplyr::desc(gpa_mean))
+
+by_prog
+```
+
+> We will look how does this program work :
+
+> First we grouped our values by their program and gpa_band,
+>
+> Then we took the summarizes of all datas (program, gpa_band) the we created a variable "n" that counts how much rows they contains by their groups
+>
+> At the final part we arrange the descending order by their gpa_band
+
+> And also .group = "drop" means that after this grouping operation drop the table immediately!
+
+# 5. Visualizing your data(students + iris)
+
+> We'll make a few clean, readable plots. Keep titles and labels informative.
+
+## 5.1. Students : GPA Distribution
+
+```{r}
+library(ggplot2)
+
+ggplot(stud_aug, aes(gpa)) +  geom_histogram(bins = 8) + 
+ labs(title = "GPA Distribution", x = "GPA", y = "Count")
+```
+
+> aes(parameter) -\> Parameter is normally the column that we will put on x-axis in ggplot2
+>
+> But if we want to use a scatter plot we must declare y-axis in aes as well
+>
+> With geom_histogram we declare which type of plot we will use.
+>
+> As you can see it means we will use a histogram!(bins -\> How much histogram should we use on geom_histogram)
+
+## 5.2 Students : GPA by program
+
+```{r}
+library(ggplot2)
+
+ggplot(stud_aug, aes(program,gpa)) + geom_boxplot() + 
+  labs(title = "GPA by program", x = "Program", y= "GPA")
+```
+
+> As you can see we used aes() function again but we declared 2 parameters because we created boxplot. Boxplots needs 2 specified parameters(labels, columns).
+
+> ***If you want to find mean value if it's a right skewed it must be mean \> median but otherwise median \> mean***
+
+> If it is a right-skewed graph median will be closer to q1
+>
+> Otherwise will be closer to q3
+
+## 5.3 Meet the iris Dataset
+
+> Iris is built into R: measurements for 150 flowers across 3 species.
+
+```{r}
+head(iris,3)
+```
+
+> We took 3 rows from iris dataset
+
+```{r}
+summary(iris)
+```
+
+### 5.3.1 Scatter with trend on iris dataset
+
+```{r}
+ggplot(iris,aes(Petal.Length, Sepal.Length, color = Species)) + 
+  geom_point(alpha = 0.8) + 
+  geom_smooth(method = "lm",se = FALSE) + 
+  labs(title = "Sepal vs Petal Length", x = "Petal Length", y = "Sepal Length")
+```
+
+> geom_smooth() writes a trend line on the graph.
+>
+> method = "lm" draws a linear model trend line.
+>
+> se = FALSE declares is there any confidence interval or not.
+
+### 5.3.2 Boxplot per Species(Iris)
+
+```{r}
+ggplot(iris,aes(Species, Sepal.Width)) + 
+  geom_boxplot() + 
+  labs(title = "Sepal Width by species(iris)", x = "Species", y = "Sepal Width")
+```
+
+> This code block examine that relationship between sepal width and species over boxplot
+
+### 5.3.3 Faceted Histogram(iris)
+
+```{r}
+ggplot(iris, aes(Sepal.Length)) +
+  geom_histogram(bins = 12) +
+  facet_wrap(~ Species, nrow = 1) +
+  labs(title = "Sepal Length Distribution by Species", x = "Sepal Length", y = "Count")
+```
+
+> ***facet_wrap()*** divides our graph into little graphs(sub-graphs)
+>
+> **Parameter** of facet_wraps does that :
+>
+> Take every species row from your main dataset than create a little subsets over first parameter of aes()
+
+# 6.Example
+
+> **Task:** Fit a simple linear model **Sepal.Length \~ Petal.Length** for each species and draw a scatter + regression line plot like 5.3.1, **but** annotate the plot subtitle with the overall R² from a single-model fit.
+
+```{r}
+library(ggplot2)
+library(broom)
+
+overall_model <- lm(Sepal.Length ~ Petal.Length, data= iris)
+
+# Take summary of statistics of overall_model
+model_stats <- broom::glance(overall_model)
+
+overall_r2 <- model_stats$r.squared
+
+subtitle_text <- paste("General R^2 (For every species in the model) : ", round(overall_r2, 3))
+
+# Drawing the graph 
+
+ggplot(iris, aes(Petal.Length, Sepal.Length)) + 
+  geom_point() + 
+  geom_smooth(method = "lm", se = FALSE, color = "blue") + 
+  facet_wrap(~ Species) + 
+  labs(title = "Relationship between Petal Length and Sepal Length", subtitle = subtitle_text, x = "Petal Length", y = "Sepal Length") + theme_bw()
+```

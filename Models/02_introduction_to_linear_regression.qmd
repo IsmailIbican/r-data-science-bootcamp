@@ -1,0 +1,152 @@
+---
+title: "Introduction to Linear Regression"
+subtitle: "Linear Regression, Visualizing Regression and Making Predictions"
+author: "Ismail Ibican"
+date: "last-modified"
+date-format: "DD MMMM YYYY"
+description: "This document explains about Linear Regression "
+
+format:
+  html:
+    lang: en
+    embed-resources: true
+    smooth-scroll: true
+    link-external-newwindow: true
+
+    theme:
+      light: zephyr
+      dark: darkly
+
+    toc: true
+    toc-location: left
+    toc-title: "Table of Contents"
+    toc-depth: 3
+    toc-expand: true
+    number-sections: true
+
+    code-fold: true
+    code-summary: "Show/Hide Code"
+    code-copy: true
+    code-overflow: scroll
+    
+    grid:
+      body-width: 1000px
+      margin-width: 300px
+      
+    callout-appearance: minimal
+---
+
+## Introduction to Linear Regression :
+
+> Linear regression is a fundamental algorithm for forecasting and analyzing relationships between variables. In this project, my goal is to model the relationship between a **dependent variable** (what we want to predict) and an **independent variable** (the factor influencing the outcome). We aim to find the mathematical line that best fits the data, minimizing the error between observed and predicted values.
+
+## Load the Libraries and Data
+
+> Before building the model, I need to set up the environment. I am importing the `ggplot2` library, which is essential for creating high-quality data visualizations later in the analysis. Then, I will load the `meta_ads_data_summer_campaign.csv` file into a dataframe to access the marketing campaign data.
+
+```{r}
+# Load necessary R libraries
+library(ggplot2)
+
+# Load the Meta Ads data
+data <- read.csv("meta_ads_data_summer_campaign.csv")
+```
+
+## Perform Linear Regression
+
+> Now, I will implement the linear regression algorithm. My objective here is to quantify the relationship between ad reach and user engagement.
+>
+> Specifically, I am defining **clicks** as the dependent variable ($y$) and **impressions** as the independent variable ($x$). By using the `lm()` function, I am instructing R to calculate the intercept and slope that minimize the sum of squared residuals. The `summary()` function is crucial here as it provides the coefficients and statistical significance metrics (like P-value and R-squared) that validate the model's performance^3333^.
+
+```{r}
+# Perform linear regression: clicks as dependent variable, impressions as independent variable
+lm_model <- lm(clicks ~ impressions, data = data)
+
+# Display the summary of the regression model
+# This shows coefficients, R-squared, and significance levels
+summary(lm_model)
+```
+
+> **Interpretation of the Model:**
+>
+> The output provides strong evidence for a linear relationship:
+>
+> -   **Coefficients:** The slope is approximately **0.057**, meaning for every additional impression, we statistically expect an increase of 0.057 clicks.
+>
+> -   **Model Fit (R-squared):** The R-squared value is **0.889**. This indicates that our model explains nearly **89%** of the variance in the data, which is a very high success rate for a real-world dataset.
+>
+> -   **Significance:** The P-value is well below 0.05, confirming that the correlation is statistically significant and not due to random chance.
+
+```{r}
+lm(formula = clicks ~ impressions, data = data)
+```
+
+> ### Python Implementation Note
+>
+> In Python, we would use the `statsmodels` library. A key difference is that we must explicitly add a constant term using `sm.add_constant()` to calculate the intercept, whereas R handles this automatically. The statistical results (coefficients and R-squared) would be identical to R.
+
+## Visualize the Regression Line
+
+> Numerical metrics are important, but visualizing the fit is necessary to detect patterns that raw numbers might miss.
+>
+> I will use `ggplot2` to create a scatter plot. The **blue points** will represent the actual ground-truth data from our CSV, while the **red line** represents the predictions made by our linear model. The shaded gray area around the line will visualize the confidence interval, showing us the range where the true regression line is likely to lie.
+
+```{r}
+# Create a scatter plot with regression line
+ggplot(data, aes(x = impressions, y = clicks)) +
+  geom_point(color = "blue", alpha = 0.6) +  # Scatter plot points
+  geom_smooth(method = "lm", color = "red", se = TRUE) +  # Regression line
+  labs(
+    title = "Regression Analysis: Clicks vs Impressions",
+    x = "Impressions",
+    y = "Clicks"
+  ) +
+  theme_minimal()
+```
+
+-   **Visual Analysis:** The plot confirms a strong positive correlation. The data points cluster tightly around the regression line, which visually supports the high R-squared value we calculated earlier. This visual confirmation gives us confidence to use the model for decision-making
+
+## Analyze Residuals
+
+> Building a model is not enough; we must diagnose its errors. Residuals are the difference between the *actual* values and the *predicted* values.
+>
+> I am plotting the residuals against the fitted values to check for **homoscedasticity** (constant variance). Ideally, the residuals should be randomly scattered around the horizontal zero line. If we see a pattern (like a U-shape), it would suggest that a linear model is not suitable for this data. This step is critical for validating the model's assumptions
+
+```{r}
+# Create a residual plot to check model diagnostics
+residuals <- resid(lm_model)
+fitted_values <- fitted(lm_model)
+ggplot(data.frame(Fitted = fitted_values, Residuals = residuals), aes(x = Fitted, y = Residuals)) +
+  geom_point(color = "blue", alpha = 0.6) +
+  geom_hline(yintercept = 0, color = "red", linetype = "dashed") +
+  labs(
+    title = "Residual Plot",
+    x = "Fitted Values",
+    y = "Residuals"
+  ) +
+  theme_minimal()
+```
+
+**Diagnostic Result:** The plot shows a random distribution of errors around the zero line (red dashed line). This indicates that the model is unbiased and the linear assumption holds true for this dataset.
+
+## Making Predictions
+
+> The practical application of this machine learning model is forecasting. Now that we have trained and validated the model, I will use it to predict outcomes for unseen data.
+>
+> I am creating a new dataframe with hypothetical impression scenarios (100k, 200k, 300k). Using the `predict()` function, the model will apply the learned coefficients to these inputs to estimate the expected number of clicks. This allows us to optimize future marketing budgets based on expected returns.
+
+```{r}
+# Predict clicks for new impressions
+new_data <- data.frame(impressions = c(100000, 200000, 300000))
+predictions <- round(predict(lm_model, new_data))  # Round predicted clicks for readability
+options(scipen = 999)  # Disable scientific notation
+print(data.frame(new_data, Predicted_Clicks = predictions))
+```
+
+> **Forecast Results:**
+>
+> -   **100,000 Impressions:** Expected to generate \~5,839 clicks.
+>
+> -   **300,000 Impressions:** Expected to generate \~17,255 clicks.
+>
+> These predictions are reliable because of our high R-squared value and significant p-value calculated earlier

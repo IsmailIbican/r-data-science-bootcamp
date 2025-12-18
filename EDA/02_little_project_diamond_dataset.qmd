@@ -1,0 +1,259 @@
+---
+title: "Diamonds Dataset Exploratory Analysis"
+author: 
+  - name: "İsmail İbican"
+    affiliation: "Software Engineering, Muğla Sıtkı Koçman University"
+date: today
+format:
+  html:
+    theme: 
+      light: flatly
+      dark: darkly
+    toc: true
+    toc-title: "📘 Table of Contents"
+    toc-location: left
+    toc-depth: 3
+    number-sections: true
+    code-fold: true
+    code-summary: "Show/Hide R Code"
+    smooth-scroll: true
+    page-layout: full
+    highlight-style: atom-one-dark
+    mainfont: "Nunito"
+    fontsize: 1.05em
+    fig-cap-location: bottom
+    linkcolor: "#0099cc"
+    backgroundcolor: "#f8f9fa"
+  pdf:
+    toc: true
+    number-sections: true
+    mainfont: "Roboto"
+    fontsize: 11pt
+    geometry: 
+      - margin=1in
+    colorlinks: true
+    linkcolor: blue
+    highlight-style: tango
+execute:
+  echo: true
+  warning: false
+  message: false
+editor: visual
+comments: false
+jupyter: false
+---
+
+# Brief Overview: Types, Summaries, Missing Values, and Outliers
+
+------------------------------------------------------------------------
+
+```{r}
+# Load required libraries
+data("diamonds")
+library(ggplot2)
+library(dplyr)
+library(psych)
+set.seed(42)
+```
+
+> We load the necessary libraries (`ggplot2` for plotting, `dplyr` for data manipulation, `psych` for detailed summaries).\
+>
+> Then we load the `diamonds` dataset.
+
+------------------------------------------------------------------------
+
+```{r}
+# Check structure and summary
+str(diamonds)
+summary(diamonds)
+describe(diamonds)
+colSums(is.na(diamonds))
+```
+
+------------------------------------------------------------------------
+
+> We inspect the **structure** of the dataset to see variable types,\
+>
+> use `summary()` for basic statistics, `describe()` for detailed numeric summaries,\
+>
+> and `colSums(is.na())` to confirm there are no missing values.
+
+------------------------------------------------------------------------
+
+```{r}
+# Outlier detection using IQR
+numeric_cols <- sapply(diamonds, is.numeric)
+for (col in names(diamonds)[numeric_cols]) {
+  Q1 <- quantile(diamonds[[col]], 0.25)
+  Q3 <- quantile(diamonds[[col]], 0.75)
+  IQR <- Q3 - Q1
+  outliers <- sum(diamonds[[col]] < (Q1 - 1.5*IQR) | diamonds[[col]] > (Q3 + 1.5*IQR))
+  cat(col, ":", outliers, "potential outliers\n")
+}
+
+```
+
+------------------------------------------------------------------------
+
+> We detect potential **outliers** in numeric variables using the **IQR method**.\
+>
+> This helps identify unusually large or small values in `price`, `x`, `y`, `z`, etc.
+
+------------------------------------------------------------------------
+
+# Categorical Coding Reasoning
+
+------------------------------------------------------------------------
+
+```{r}
+levels(diamonds$cut)
+levels(diamonds$color)
+levels(diamonds$clarity)
+
+```
+
+------------------------------------------------------------------------
+
+> We examine **factor levels**.
+>
+> -   `cut` → ordinal, representing quality (Fair \< Ideal)
+>
+> -   `color` → ordinal, D is best
+>
+> -   `clarity` → ordinal, I1 is worst, IF is best\
+>     This explains why these variables are treated as **ordinal factors**
+
+------------------------------------------------------------------------
+
+# Transformations (Log–Log Model)
+
+------------------------------------------------------------------------
+
+```{r}
+diamonds <- diamonds %>%
+  mutate(log_price = log(price),
+         log_carat = log(carat))
+cor(diamonds$price, diamonds$carat)
+cor(diamonds$log_price, diamonds$log_carat)
+
+```
+
+------------------------------------------------------------------------
+
+> We apply a **log transformation** to `price` and `carat` to linearize their exponential relationship.\
+>
+> After transformation, the correlation increases, confirming a more linear relationship suitable for modeling.
+
+------------------------------------------------------------------------
+
+# Plots with Titles, Axes, and Captions Scatter Plot: log(Price) vs log(Carat)
+
+------------------------------------------------------------------------
+
+```{r}
+ggplot(diamonds, aes(x = log_carat, y = log_price, color = cut)) +
+  geom_point(alpha = 0.3, size = 1) +
+  labs(
+    title = "Relationship Between log(Price) and log(Carat)",
+    x = "log(Carat)",
+    y = "log(Price)",
+    color = "Cut Quality",
+    caption = "Log transformations linearize the exponential price–carat relationship."
+  ) +
+  theme_minimal()
+
+```
+
+------------------------------------------------------------------------
+
+> A scatter plot showing **log-transformed price vs carat**, colored by cut.\
+>
+> The log transformation **helps visualize a linear trend** for modeling purposes.
+
+------------------------------------------------------------------------
+
+## Boxplot: Price by Clarity
+
+------------------------------------------------------------------------
+
+```{r}
+ggplot(diamonds, aes(x = clarity, y = price, fill = clarity)) +
+  geom_boxplot(outlier.color = "red", alpha = 0.7) +
+  labs(
+    title = "Distribution of Diamond Prices by Clarity",
+    x = "Clarity Grade",
+    y = "Price (USD)",
+    caption = "Higher clarity grades generally correspond to higher prices."
+  ) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+```
+
+------------------------------------------------------------------------
+
+> Boxplots show the **spread of price across clarity grades**, highlighting how higher clarity generally increases price.\
+>
+> Outliers are marked in red.
+
+------------------------------------------------------------------------
+
+## Bar Plot: Count by Color
+
+------------------------------------------------------------------------
+
+```{r}
+ggplot(diamonds, aes(x = color, fill = color)) +
+  geom_bar() +
+  labs(
+    title = "Count of Diamonds by Color Grade",
+    x = "Color Grade (D = Best)",
+    y = "Count of Diamonds",
+    caption = "Most diamonds fall within mid-range color grades (G–H–I)."
+  ) +
+  theme_minimal()
+
+```
+
+> Bar plot showing the **number of diamonds in each color grade**, useful for understanding dataset distribution.
+
+------------------------------------------------------------------------
+
+## Histogram: Price Distribution
+
+------------------------------------------------------------------------
+
+```{r}
+ggplot(diamonds, aes(x = price)) +
+  geom_histogram(bins = 50, fill = "skyblue", color = "white") +
+  labs(
+    title = "Histogram of Diamond Prices",
+    x = "Price (USD)",
+    y = "Frequency",
+    caption = "Price distribution is right-skewed; many affordable diamonds, few very expensive ones."
+  ) +
+  theme_minimal()
+
+```
+
+------------------------------------------------------------------------
+
+> Histogram visualizes the **skewed distribution of prices**, showing that most diamonds are in a lower price range.
+
+# Summary
+
+------------------------------------------------------------------------
+
+> -   Dataset has **no missing values**.
+>
+> <!-- -->
+>
+> -   Categorical variables are **ordinal** and represent quality levels.
+>
+> <!-- -->
+>
+> -   Log–log transformation improves the **linear relationship between carat and price**.
+>
+> <!-- -->
+>
+> -   Plots are annotated for clarity with **titles, axes, and captions**, making the report readable and self-contained.

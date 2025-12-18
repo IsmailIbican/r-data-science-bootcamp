@@ -1,0 +1,692 @@
+---
+title: "Regression Trees"
+subtitle: "Working on Regression Trees"
+author: "Ismail Ibican"
+date: "last-modified"
+date-format: "DD MMMM YYYY"
+description: "In this study, I explored Regression Trees, Bagging methods, and Linear Model Selection techniques using R."
+
+format:
+  html:
+    lang: en
+    embed-resources: true
+    smooth-scroll: true
+    link-external-newwindow: true
+
+    theme:
+      light: zephyr
+      dark: darkly
+
+    toc: true
+    toc-location: left
+    toc-title: "Table of Contents"
+    toc-depth: 3
+    toc-expand: true
+    number-sections: true
+
+    code-fold: true
+    code-summary: "Show/Hide Code"
+    code-copy: true
+    code-overflow: scroll
+    
+    grid:
+      body-width: 1000px
+      margin-width: 300px
+      
+    callout-appearance: minimal
+---
+
+# Regression Trees
+
+> Basically, **regression trees** take a dataset, split it into smaller groups, and fit a simple model (usually a constant value) for each group. Honestly, using just a single tree is not very stable and doesn't give the best predictions. However, if we use **bagging** (bootstrap aggregating), we can combine multiple trees to make the model much more powerful. Also, understanding this is key because it forms the foundation for advanced models like *Random Forests* and *Gradient Boosting*. In this file, I will show how to work with regression trees and bagging.
+
+## Replication Requirements
+
+> I used the following packages for this project. The most important one here is `rpart` for building the trees, but I also used others for data manipulation and plotting.
+>
+> *(Ames housing data kısmı)* To demonstrate regularization, I used the Ames Housing dataset from the `AmesHousing` package.
+>
+> *(Split code description)* Here, I split the data into training (70%) and test (30%) sets. I also used `set.seed` to make sure I get the same results every time.
+
+```{r}
+library(rsample)     # data splitting 
+library(dplyr)       # data wrangling
+library(rpart)       # performing regression trees
+library(rpart.plot)  # plotting regression trees
+library(ipred)       # bagging
+library(caret)       # bagging
+```
+
+> To illustrate various regularization concepts we will use the Ames Housing data that has been included in the `AmesHousing` package.
+
+```{r}
+
+# Create training (70%) and test (30%) sets for the AmesHousing::make_ames() data.
+# Use set.seed for reproducibility
+
+set.seed(123)
+ames_split <- initial_split(AmesHousing::make_ames(), prop = .7)
+ames_train <- training(ames_split)
+ames_test  <- testing(ames_split)
+```
+
+## The Idea
+
+> There are different ways to build trees, but I am focusing on the CART (Classification and Regression Tree) approach.
+>
+> Simply put, regression trees partition the data into subgroups and predict a constant value for each subgroup.
+>
+> This partitioning happens step-by-step (recursive partitioning).
+>
+> The prediction is usually the average value of the observations in that leaf.
+>
+> For example, imagine predicting a car's MPG (miles per gallon) using cylinders and horsepower.
+>
+> The tree asks questions like "Does it have 6 or 8 cylinders?". If yes, go left; if no, go right.
+>
+> Then it might ask about horsepower.
+>
+> Finally, we reach the terminal nodes (leaves) which give us the predicted value.
+>
+> So, in a general sense, we have inputs ($X_1, X_2$) and we are trying to predict a continuous response $Y$. The tree divides the space into regions and predicts a constant for each region.
+
+### Deciding on splits
+
+> The algorithm works in a "greedy" way. This means it makes the best split decision at the current step without worrying about future splits. It searches through all variables to find the split that minimizes the sum of squares error (SSE).
+>
+> It keeps splitting until it reaches a stopping point. However, if we let the tree grow too deep, it will overfit. It might look great on training data but will fail on new data.
+>
+> For instance, looking at the Boston housing dataset, deep trees differ a lot based on the sample. The deeper nodes just memorize the noise in the data. To fix this, we need to "prune" the tree. This adds a bit of bias but makes the model much more stable
+
+### Cost complexity criterion
+
+> We need to find a balance between a complex tree and a simple one.
+>
+> Usually, I grow a large tree first and then prune it back to find the optimal subtree.
+>
+> I used a cost complexity parameter (alpha) for this. It penalizes the model if it has too many terminal nodes.
+>
+> For a specific alpha, we find the smallest tree with the lowest error. This is very similar to the Lasso (L1) penalty in regression.
+>
+> Smaller penalties give us larger trees, while larger penalties give smaller trees.
+>
+> We generally use cross-validation to find the best \$\\alpha\$.
+
+### Strengths and weaknesses
+
+> Regression trees have some cool **advantages**:
+>
+> -   They are super easy to interpret.
+>
+> -   Predictions are fast.
+>
+> -   It is easy to see which variables are important.
+>
+> -   They can handle missing data nicely.
+>
+> -   They can model non-linear relationships.
+
+> But there are some **weaknesses**:
+>
+> -   Single trees have high variance (unstable predictions).
+>
+> -   Because of high variance, the accuracy isn't always great.
+
+## Basic Implementation
+
+> I used the `rpart` package to fit the model and `rpart.plot` to visualize it. It uses a formula syntax similar to `lm`. Since this is a regression problem, I had to set `method = "anova"`. It's better to set this explicitly for reproducibility
+
+```{r}
+m1 <- rpart(
+  formula = Sale_Price ~ .,
+  data    = ames_train,
+  method  = "anova"
+  )
+```
+
+> Let's look at the `m1` output. It shows the splitting steps. For example, the root node starts with 2051 observations. The first best split is on `Overall_Qual`. Houses with lower quality go to one branch, and houses with high quality go to the other. It shows the average price and error for each node.
+
+```{r}
+m1
+```
+
+> I visualized the model below. The plot shows the percentage of data in each node and the average sales price. Interestingly, the tree only used 11 variables to split, even though the dataset has 80 variables.
+
+```{r}
+rpart.plot(m1)
+```
+
+```{r}
+plotcp(m1)
+```
+
+> Behind the scenes, `rpart` tries different cost complexity ($\alpha$) values. It does 10-fold cross-validation to check the error.
+>
+> The plot below shows the error against the tree size. Suggest using the "1-SE rule" picking the smallest tree within one standard deviation of the minimum error.
+
+```{r}
+m2 <- rpart(
+    formula = Sale_Price ~ .,
+    data    = ames_train,
+    method  = "anova", 
+    control = list(cp = 0, xval = 10)
+)
+
+plotcp(m2)
+abline(v = 12, lty = "dashed")
+```
+
+> To show why pruning matters, I forced a full tree using `cp = 0`. As you can see, after about 12 terminal nodes, the error doesn't drop much. So, pruning is definitely a good idea here.
+
+```{r}
+m1$cptable
+```
+
+> By default, `rpart` found an optimal tree with 12 terminal nodes. But I can try to tune it further to get better results.
+
+## Tuning
+
+In addition to the cost complexity (α) parameter, it is also common to tune:
+
+-   `minsplit`: the minimum number of data points required to attempt a split before it is forced to create a terminal node. The default is 20. Making this smaller allows for terminal nodes that may contain only a handful of observations to create the predicted value.
+
+-   `maxdepth`: the maximum number of internal nodes between the root node and the terminal nodes. The default is 30, which is quite liberal and allows for fairly large trees to be built.
+
+`rpart` uses a special `control` argument where we provide a list of hyperparameter values. For example, if we wanted to assess a model with `minsplit` = 10 and `maxdepth` = 12, we could execute the following:
+
+```{r}
+m3 <- rpart(
+    formula = Sale_Price ~ .,
+    data    = ames_train,
+    method  = "anova", 
+    control = list(minsplit = 10, maxdepth = 12, xval = 10)
+)
+
+m3$cptable
+```
+
+> Doing this one by one is tedious. So, I performed a grid search to test many combinations automatically. I created a grid for `minsplit` (5-20) and `maxdepth` (8-15). This resulted in 128 different models.
+
+```{r}
+hyper_grid <- expand.grid(
+  minsplit = seq(5, 20, 1),
+  maxdepth = seq(8, 15, 1)
+)
+
+head(hyper_grid)
+##   minsplit maxdepth
+## 1        5        8
+## 2        6        8
+## 3        7        8
+## 4        8        8
+## 5        9        8
+## 6       10        8
+
+# total number of combinations
+nrow(hyper_grid)
+## [1] 128
+```
+
+To automate the modeling we simply set up a `for` loop and iterate through each `minsplit` and `maxdepth` combination. We save each model into its own list item.
+
+```{r}
+models <- list()
+
+for (i in 1:nrow(hyper_grid)) {
+  
+  # get minsplit, maxdepth values at row i
+  minsplit <- hyper_grid$minsplit[i]
+  maxdepth <- hyper_grid$maxdepth[i]
+
+  # train a model and store in the list
+  models[[i]] <- rpart(
+    formula = Sale_Price ~ .,
+    data    = ames_train,
+    method  = "anova",
+    control = list(minsplit = minsplit, maxdepth = maxdepth)
+    )
+}
+```
+
+```{r}
+# function to get optimal cp
+get_cp <- function(x) {
+  min    <- which.min(x$cptable[, "xerror"])
+  cp <- x$cptable[min, "CP"] 
+}
+
+# function to get minimum error
+get_min_error <- function(x) {
+  min    <- which.min(x$cptable[, "xerror"])
+  xerror <- x$cptable[min, "xerror"] 
+}
+
+hyper_grid %>%
+  mutate(
+    cp    = purrr::map_dbl(models, get_cp),
+    error = purrr::map_dbl(models, get_min_error)
+    ) %>%
+  arrange(error) %>%
+  top_n(-5, wt = error)
+##   minsplit maxdepth        cp     error
+## 1       15       12 0.0100000 0.2419963
+## 2        5       13 0.0100000 0.2422198
+## 3        7       10 0.0100000 0.2438687
+## 4       17       13 0.0108982 0.2468053
+## 5       19       13 0.0100000 0.2475141
+```
+
+> Then, I wrote a function to extract the minimum error and the optimal $\alpha$ for each model.
+>
+> After filtering the results, the best model performed slightly better than my first one (error dropped from 0.272 to 0.242)
+
+```{r}
+    optimal_tree <- rpart(
+    formula = Sale_Price ~ .,
+    data    = ames_train,
+    method  = "anova",
+    control = list(minsplit = 11, maxdepth = 8, cp = 0.01)
+    )
+
+pred <- predict(optimal_tree, newdata = ames_test)
+RMSE(pred = pred, obs = ames_test$Sale_Price)
+```
+
+## Bagging
+
+### The idea
+
+**The idea**
+
+As I mentioned, single trees are unstable. **Bagging** (Bootstrap Aggregating) helps fix this by combining multiple trees. Averaging many trees reduces variance and helps prevent overfitting.
+
+The steps are simple:
+
+1.  Create *m* bootstrap samples from the training data.
+
+2.  Train a tree on each sample.
+
+3.  Average the predictions.
+
+This works best for models with high variance like trees. Also, since each bootstrap sample uses about 63% of the data, the remaining 33% (Out-of-Bag or OOB) can be used to estimate the error.
+
+### Bagging with `ipred`
+
+> I used `ipred::bagging` for this. I set `coob = TRUE` to see the out-of-bag error. The error dropped to about 36,543, which is better than the single tree!
+
+```{r}
+# make bootstrapping reproducible
+set.seed(123)
+
+# train bagged model
+bagged_m1 <- bagging(
+  formula = Sale_Price ~ .,
+  data    = ames_train,
+  coob    = TRUE
+)
+
+bagged_m1
+
+```
+
+```{r}
+# assess 10-50 bagged trees
+ntree <- 10:50
+
+# create empty vector to store OOB RMSE values
+rmse <- vector(mode = "numeric", length = length(ntree))
+
+for (i in seq_along(ntree)) {
+  # reproducibility
+  set.seed(123)
+  
+  # perform bagged model
+  model <- bagging(
+  formula = Sale_Price ~ .,
+  data    = ames_train,
+  coob    = TRUE,
+  nbagg   = ntree[i]
+)
+  # get OOB error
+  rmse[i] <- model$err
+}
+
+plot(ntree, rmse, type = 'l', lwd = 2)
+abline(v = 25, col = "red", lty = "dashed")
+
+```
+
+> Usually, more trees are better. The error drops quickly and then stabilizes. I checked the error for 10 to 50 trees below. It seems to stabilize around 25 trees.
+
+> ### Bagging with `caret`
+>
+> Using `caret` is also great because it makes cross-validation easier and lets me check variable importance.
+>
+> I ran a 10-fold cross-validation. The RMSE was around 36,477.
+>
+> The plot below shows the most important variables. Importance is calculated by how much a variable reduces the SSE.
+
+```{r}
+# Specify 10-fold cross validation
+ctrl <- trainControl(method = "cv",  number = 10) 
+
+# CV bagged model
+bagged_cv <- train(
+  Sale_Price ~ .,
+  data = ames_train,
+  method = "treebag",
+  trControl = ctrl,
+  importance = TRUE
+  )
+
+# assess results
+bagged_cv
+## Bagged CART 
+## 
+## 2051 samples
+##   80 predictor
+## 
+## No pre-processing
+## Resampling: Cross-Validated (10 fold) 
+## Summary of sample sizes: 1846, 1845, 1847, 1845, 1846, 1847, ... 
+## Resampling results:
+## 
+##   RMSE      Rsquared   MAE     
+##   36477.25  0.8001783  24059.85
+
+# plot most important variables
+plot(varImp(bagged_cv), 20)  
+```
+
+> If we compare this to the test set out of sample we see that our cross-validated error estimate was very close. We have successfully reduced our error to about \$35,000; however, in later tutorials we’ll see how extensions of this bagging concept (random forests and GBMs) can significantly reduce this further.
+
+```{r}
+pred <- predict(bagged_cv, ames_test)
+RMSE(pred, ames_test$Sale_Price)
+## [1] 35262.59
+```
+
+> Finally, I tested this bagged model on the test set. The RMSE is about 35,262, which is a significant improvement over the single tree.
+
+# Linear Model Selection
+
+> Sometimes we have variables in our dataset that don't actually help predict anything. Keeping them just makes the model complex. Instead of manually checking every variable, I used **model selection** techniques to find the best features automatically.
+
+> ## Replication Requirements
+>
+> For this part, I used the `Hitters` dataset from the `ISLR` library. It has baseball data like runs, hits, etc. I also used the `leaps` package for the subset selection
+
+```{r}
+# Packages
+library(tidyverse)  # data manipulation and visualization
+library(leaps)      # model selection functions
+
+# Load data and remove rows with missing data
+(
+  hitters <- na.omit(ISLR::Hitters) %>%
+    as_tibble
+  )
+```
+
+## Best Subset Selection
+
+> To perform best subset selection, we fit a separate least squares regression for each possible combination of the *p* predictors. That is, we fit all *p* models that contain exactly one predictor, all (p2)=p(p−1)/2 models that contain exactly two predictors, and so forth. We then look at all of the resulting models, with the goal of identifying the one that is best.
+
+The three-stage process of performing best subset selection includes:
+
+-   **Step 1:** Let M0 denote the null model, which contains no predictors. This model simply predicts the sample mean for each observation.
+
+-   **Step 2:** For k=1,2,…p;
+
+-   Fit all (pk) models that contain exactly *k* predictors.
+
+-   Pick the best among these (pk) models, and call it Mk. Here best is defined as having the smallest RSS, or equivalently largest R2.
+
+-   **Step 3:** Select a single best model from among M0,…,Mp using cross-validated prediction error, Cp\< , AIC, BIC, or adjusted R2.
+
+> This method fits a model for *every possible combination* of predictors. It tries all 1-variable models, all 2-variable models, etc., and picks the best one for each size.
+>
+> I used `regsubsets` to do this. I set `nvmax = 19` to check up to 19 variables.
+
+```{r}
+best_subset <- regsubsets(Salary ~ ., hitters, nvmax = 19)
+```
+
+> The `resubsets` function returns a list-object with *lots* of information. Initially, we can use the `summary` command to assess the best set of variables for each model size. So, for a model with 1 variable we see that CRBI has an asterisk signalling that a regression model with *Salary \~ CRBI* is the best single variable model. The best 2 variable model is *Salary \~ CRBI + Hits*. The best 3 variable model is *Salary \~ CRBI + Hits + PutOuts*. An so forth.
+
+```{r}
+summary(best_subset)
+```
+
+> We can also get get the RSS, R2, adjusted R2, Cp, and BIC from the results which helps us to assess the *best* overall model; however, we’ll illustrate this in the [comparing models](https://uc-r.github.io/model_selection#compare) section. First, let’s look at how to perform stepwise selection.
+
+> ### Forward Stepwise
+>
+> Checking every combination (Best Subset) can be slow. **Forward stepwise** starts with a null model (no predictors) and adds them one by one. At each step, it adds the variable that improves the fit the most.
+>
+> I did this by setting `method = "forward"` in `regsubsets`.
+
+```{r}
+forward <- regsubsets(Salary ~ ., hitters, nvmax = 19, method = "forward")
+```
+
+> ### Backward Stepwise
+>
+> **Backward stepwise** does the opposite. It starts with all variables and removes the least useful one at each step.
+>
+> I ran this using `method = "backward"`.
+
+```{r}
+backward <- regsubsets(Salary ~ ., hitters, nvmax = 19, method = "backward")
+```
+
+## Comparing Models
+
+Now I have a bunch of "best" models of different sizes. How do I pick the overall winner? I can't just use the training error because bigger models always have lower training error (overfitting).
+
+### Indirectly Estimating Test Error with Cp, AIC, BIC, and Adjusted R2
+
+I can use statistics like Cp, AIC, BIC, or Adjusted \$R\^2\$.
+
+These metrics add a penalty for the number of variables, so they help avoid overfitting.
+
+I split the data into training and test sets and plotted these statistics.
+
+The results were a bit mixed:
+
+-   Adjusted $R^2$ liked the 10-variable model.
+
+-   BIC liked the 4-variable model.
+
+-   Cp liked the 8-variable model.
+
+| Statistic                            | Objective | Equation                    |
+|--------------------------------------|-----------|-----------------------------|
+| Cp                                   | Minimize  | Cp=1n(RSS+2d\^σ)            |
+| Akaike information criterion (AIC)   | Minimize  | AIC=1n\^σ2(RSS+2d\^σ2)      |
+| Bayesian information criterion (BIC) | Minimize  | BIC=1n(RSS+log(n)d\^σ2)     |
+| adjusted R2                          | Maximize  | adj R2=1−RSS/n−d−1TSS/(n−1) |
+
+where *d* is the number of predictors and σ2 is an estimate of the variance of the error (ϵ) associated with each response measurement in a regression model. Each of these statistics adds a penalty to the training RSS in order to adjust for the fact that the training error tends to underestimate the test error. Clearly, the penalty increases as the number of predictors in the model increases.
+
+Therefore, these statistics provide an unbiased estimate of test MSE. If we perform our model using a training vs. testing validation approach we can use these statistics to determine the preferred model. These statistics are contained in the output provided by the `regsubsets` function. Let’s extract this information and plot them.
+
+```{r}
+set.seed(1)
+sample <- sample(c(TRUE, FALSE), nrow(hitters), replace = T, prob = c(0.6,0.4))
+train <- hitters[sample, ]
+test <- hitters[!sample, ]
+
+# perform best subset selection
+best_subset <- regsubsets(Salary ~ ., train, nvmax = 19)
+results <- summary(best_subset)
+
+# extract and plot results
+tibble(predictors = 1:19,
+       adj_R2 = results$adjr2,
+       Cp = results$cp,
+       BIC = results$bic) %>%
+  gather(statistic, value, -predictors) %>%
+  ggplot(aes(predictors, value, color = statistic)) +
+  geom_line(show.legend = F) +
+  geom_point(show.legend = F) +
+  facet_wrap(~ statistic, scales = "free")
+```
+
+> Here we see that our results identify slightly different models that are considered the best. The adjusted R2 statistic suggests the 10 variable model is preferred, the BIC statistic suggests the 4 variable model, and the Cp suggests the 8 variable model.^[3](https://uc-r.github.io/model_selection#fn:diag)^
+
+```{r}
+which.max(results$adjr2)
+## [1] 10
+which.min(results$bic)
+## [1] 4
+which.min(results$cp)
+## [1] 8
+```
+
+> We can compare the variables and coefficients that these models include using the `coef` function.
+
+```{r}
+coef(best_subset, 10)
+
+coef(best_subset,4)
+
+coef(best_subset, 8)
+```
+
+> I also checked the Cp for Forward and Backward stepwise. Both suggested an 8-variable model. However, when I checked the coefficients, the 8 variables selected were actually different for each method! This shows that different methods can lead to different "best" models.
+
+```{r}
+forward <- regsubsets(Salary ~ ., train, nvmax = 19, method = "forward")
+backward <- regsubsets(Salary ~ ., train, nvmax = 19, method = "backward")
+
+# which models minimize Cp?
+which.min(summary(forward)$cp)
+## [1] 8
+which.min(summary(backward)$cp)
+## [1] 8
+```
+
+```{r}
+coef(best_subset, 8)
+coef(forward, 8)
+coef(backward,8)
+```
+
+This highlights two important findings:
+
+1.  Different subsetting procedures (best subset vs. forward stepwise vs. backward stepwise) will likely identify different “best” models.
+
+2.  Different indirect error test estimate statistics (Cp, AIC, BIC, and Adjusted R2) will likely identify different “best” models.
+
+This is why it is important to always perform validation; that is, to always estimate the test error directly either by using a validation set or using cross-validation.
+
+### Directly Estimating Test Error
+
+Instead of using penalties like AIC, we can estimate the test error directly.
+
+Here, I used a **validation set approach**. I looped through each model size (1 to 19), made predictions on the test set, and calculated the MSE. Surprisingly, with this specific train/test split, the 1-variable model had the lowest error! But this is highly variable depending on how I split the data. If I change the seed, the result changes
+
+```{r}
+test_m <- model.matrix(Salary ~ ., data = test)
+```
+
+> Now we can loop through each model size (i.e. 1 variable, 2 variables,…, 19 variables) and extract the coefficients for the best model of that size, multiply them into the appropriate columns of the test model matrix to form the predictions, and compute the test MSE.
+
+```{r}
+# create empty vector to fill with error values
+validation_errors <- vector("double", length = 19)
+
+for(i in 1:19) {
+  coef_x <- coef(best_subset, id = i)                     # extract coefficients for model size i
+  pred_x <- test_m[ , names(coef_x)] %*% coef_x           # predict salary using matrix algebra
+  validation_errors[i] <- mean((test$Salary - pred_x)^2)  # compute test error btwn actual & predicted salary
+}
+
+# plot validation errors
+plot(validation_errors, type = "b")
+```
+
+> To be more robust, I used **k-fold Cross-Validation**.
+>
+> First, I wrote a custom predict function for `regsubsets` because it doesn't have one built-in.
+>
+> Then, I split the data into 10 folds.
+>
+> I used a nested loop: for each fold, I performed best subset selection and calculated the error.
+
+```{r}
+# create training - testing data
+set.seed(5)
+sample <- sample(c(TRUE, FALSE), nrow(hitters), replace = T, prob = c(0.6,0.4))
+train <- hitters[sample, ]
+test <- hitters[!sample, ]
+
+# perform best subset selection
+best_subset <- regsubsets(Salary ~ ., train, nvmax = 19)
+
+# compute test validation errors
+test_m <- model.matrix(Salary ~ ., data = test)
+validation_errors <- vector("double", length = 19)
+
+for(i in 1:19) {
+  coef_x <- coef(best_subset, id = i)                     # extract coefficients for model size i
+  pred_x <- test_m[ , names(coef_x)] %*% coef_x           # predict salary using matrix algebra
+  validation_errors[i] <- mean((test$Salary - pred_x)^2)  # compute test error btwn actual & predicted salary
+}
+
+# plot validation errors
+plot(validation_errors, type = "b")
+```
+
+> A more robust approach is to perform cross validation. But before we do, let’s turn our our approach above for computing test errors into a function. Our function pretty much mimics what we did above. The only complex part is how we extracted the formula used in the call to `regsubsets`. I suggest you work through this line-by-line to understand what each step is doing.
+
+```{r}
+predict.regsubsets <- function(object, newdata, id ,...) {
+  form <- as.formula(object$call[[2]]) 
+  mat <- model.matrix(form, newdata)
+  coefi <- coef(object, id = id)
+  xvars <- names(coefi)
+  mat[, xvars] %*% coefi
+  }
+```
+
+> We now try to choose among the models of different sizes using k-fold cross-validation. This approach is somewhat involved, as we must perform best subset selection *within each of the k training sets*. First, we create a vector that allocates each observation to one of *k = 10* folds, and we create a matrix in which we will store the results.
+
+```{r}
+k <- 10
+set.seed(1)
+folds <- sample(1:k, nrow(hitters), replace = TRUE)
+cv_errors <- matrix(NA, k, 19, dimnames = list(NULL, paste(1:19)))
+```
+
+> Now we write a for loop that performs cross-validation. In the *j*th fold, the elements of folds that equal *j* are in the test set, and the remainder are in the training set. We make our predictions for each model size, compute the test errors on the appropriate subset, and store them in the appropriate slot in the matrix `cv_errors`.
+
+```{r}
+for(j in 1:k) {
+  
+  # perform best subset on rows not equal to j
+  best_subset <- regsubsets(Salary ~ ., hitters[folds != j, ], nvmax = 19)
+  
+  # perform cross-validation
+  for( i in 1:19) {
+    pred_x <- predict.regsubsets(best_subset, hitters[folds == j, ], id = i)
+    cv_errors[j, i] <- mean((hitters$Salary[folds == j] - pred_x)^2)
+    }
+  }
+```
+
+> This has given us a 10×19 matrix, of which the (*i,j*)th element corresponds to the test MSE for the *i*th cross-validation fold for the best *j*-variable model. We use the `colMeans` function to average over the columns of this matrix in order to obtain a vector for which the *j*th element is the cross-validation error for the *j*-variable model.
+
+```{r}
+mean_cv_errors <- colMeans(cv_errors)
+
+plot(mean_cv_errors, type = "b")
+```
+
+> We see that our more robust cross-validation approach selects an 11-variable model. We can now perform best subset selection on the full data set in order to obtain the 11-variable model.
+
+```{r}
+final_best <- regsubsets(Salary ~ ., data = hitters , nvmax = 19)
+coef(final_best, 11)
+```

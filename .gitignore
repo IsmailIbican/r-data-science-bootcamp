@@ -1,0 +1,19 @@
+# History and Session Data
+.Rhistory
+.RData
+.Ruserdata
+.Rproj.user/
+
+# Quarto / RMarkdown Cache & Outputs
+*_files/
+*_cache/
+/.quarto/
+
+# OS Generated Files
+.DS_Store
+Thumbs.db
+
+# Python/Environment files (if mixed)
+__pycache__/
+*.pyc
+.ipynb_checkpoints/

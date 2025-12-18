@@ -1,0 +1,424 @@
+---
+title: "Classification Decision Trees"
+subtitle: "Trees, Splitting Criterias, And Their Algorithms"
+author: "Ismail Ibican"
+date: last-modified
+date-format: "MMMM D, YYYY"
+format:
+  html:
+    theme: 
+      light: cosmo
+      dark: darkly
+    toc: true
+    toc-depth: 3
+    toc-location: left
+    toc-title: "On this page"
+    number-sections: false
+    code-fold: true
+    code-summary: "Show the code"
+    code-tools: true
+    code-overflow: wrap
+    highlight-style: github
+    smooth-scroll: true
+    title-block-banner: true
+    title-block-banner-color: "white"
+    fig-align: center
+    fig-cap-location: margin
+execute:
+  warning: false
+  message: false
+  echo: true
+editor: visual
+---
+
+# Chapter 5 : Classification Decision Trees :
+
+## 5.1 Splitting Criteria :
+
+> To choice for a node, a variable and a splitting criteria is a must. We use metrics to split variables.
+>
+> Commonly choices Information Gain, Gini impurity, Or another possibly used method is Chi-square Criterion.
+
+### 5.1.1 Measuring Information Gain :
+
+> Information Gain, like [Gini Impurity](https://victorzhou.com/blog/gini-impurity/), is a metric used to train Decision Trees. Specifically, these metrics measure the **quality of a split**. For example, say we have the following data:
+
+### 5.1.2 Gini Impurity :
+
+> If you look at the documentation for the [DecisionTreeClassifier](https://scikit-learn.org/stable/modules/generated/sklearn.tree.DecisionTreeClassifier.html) class in [scikit-learn](https://scikit-learn.org/), you’ll see something like this for the `criterion` parameter:
+>
+> The [RandomForestClassifier](https://scikit-learn.org/stable/modules/generated/sklearn.ensemble.RandomForestClassifier.html) documentation says the same thing. Both mention that the default criterion is “gini” for the **Gini Impurity**.
+
+### 5.1.3 Chi-square Criterion :
+
+> Probably the oldest splitting criterion used when generating a decision tree makes uses of Chi-Square statitics to find out which of the features is strongest correlated to the target function.\
+> However it is no longer used that often, and is beyond the scope of this book.
+
+## 5.2 Examples : Predicting Tables
+
+```{r}
+df <- read.csv("C:/Users/Karsaya/Desktop/diabetes.csv")
+```
+
+> Predicting diabetes\
+> Data set: [example from UCI website](https://archive.ics.uci.edu/ml/datasets/Early+stage+diabetes+risk+prediction+dataset.)
+
+> The data set consists of 520 observations on 17 features. The target variable is the Class variable which can take on two values, Positive and Negative. All but one of the features are binary. The non binary feature is the Age feature.
+
+> **Table 1**\
+> First Six Observations of the Diabetes Data Set
+
+```{r}
+library(flextable)
+flextable(head(df)) |>
+  fontsize(size = 7, part = "all")
+```
+
+> **Table 2**\
+> Summary of the data
+
+```{r}
+summary(df)
+```
+
+> We can analyse our data with using summary(df) method to know which feature we will work on.
+
+#### Data cleaning and Preprocessing
+
+> Correct variable names (no spaces).\
+> Transform class variable in a factor variable with two levels, POS and NEG.
+
+```{r}
+library(stringr)
+df_prep <- df
+names(df_prep) <- make.names(names(df_prep)) |>
+  toupper() |> str_replace_all("[\\.]", "_")
+
+#transform CLASS variable into type factor variable
+df_prep$CLASS <- factor(df_prep$CLASS, levels = c("Positive", "Negative"),
+                        labels = c("POS", "NEG"))
+```
+
+#### 5.2.0.1 Creating a Decision Tree Model using Rpart :
+
+> As a first step we must split the data as 70% in training, 30% for testing. To do that we will use caret::createDataPartition() function to split them. (We are splitting Positivies and Negatives for our model)
+
+```{r}
+library(caret)
+library(ggplot2)
+library(lattice)
+set.seed(42)
+
+train <- createDataPartition(df_prep$CLASS, p=0.70, list = FALSE)
+
+df_train <- df_prep[train,]
+```
+
+> Then we will create a df for testing part as well
+
+```{r}
+df_test <- df_prep[-train]
+```
+
+> Then we will use rpart::rpart() function to create a decision tree to start classification.
+>
+> This function uses Gini to make choices over features(variables) to measure impurity and information gain (To choose the better features to use)
+
+```{r}
+library(rpart)
+tree_01 <- rpart(CLASS~., data = df_train)
+
+# There is a other options :
+# tree_01 <- rpart(CLASS~, data = df_train,
+#                  params = list(split="gini"))
+```
+
+> To visualize the decision tree we will use library(rpart.plot)
+
+```{r}
+library(rpart.plot)
+
+rpart.plot(tree_01, extra=104)
+```
+
+> This is the default tree plot made bij the rpart.plot() function. Each node shows (1) the predicted class, (2) the predicted probability of NEG and (3) the percentage of observations in the node. It is possible to change the lay-out of the plots and/or to show other information in the nodes.\
+> For more information about the rpart.plot() function, see the help function and the [vignette](http://www.milbo.org/rpart-plot/prp.pdf).\
+> Assessing the decision tree model {-}
+>
+> First assess the model on the training data:
+>
+> -   use predict() function to make predictions with the tree_01 model
+>
+> -   construct a confusion matrix
+>
+> -   calculate model Accuracy
+
+```{r}
+pred_tree01 <- predict(tree_01, newdata = df_train, type = "class")
+cm <- table(pred_tree01, df_train$CLASS)
+cm
+```
+
+> The Accuracy on the training data equals 0.918. This is a very high Accuracy, but the Accuracy on the test set is more interesting.
+
+> The Accuracy on the test data equals 0.904. Although it is a bit lower than the Accuracy on the training data, it is still a high Accuracy.
+>
+> It seems that the decision tree model performs quit well on this dataset.
+>
+> The Accuracy on the test data is the estimate for the performance of the model outside the data used to construct the model. This estimates highly depends on the splitting in a training and a test set. Another split could lead to a different estimate. That’s why repeating this procedure and using the average of the estimates for the Accuracy as the estimate for the out-of-sample Accuracy is recommended. Cross Validation or Bootstrapping are other options to come to a good estimate for the out-of-sample performance of the model.\
+> The R caret package has built-in possibilities to use one of these techniques to assess the performance of a ML model.
+
+#### 5.2.0.2 Creating a Decision Tree Model using Rpart within caret package
+
+> In this section the caret package is used to generate an rpart decision tree model.
+>
+> The central function in the caret package is the train() function. It can be used to generate a wide variety of models. Actually the caret package is a package which includes a variety of packages to generate ML models. Besides that it provides preprocessing functions and options to use cross validation, bootstrapping, splitting data in training and test data and lots more.
+>
+> First explore the use of rpart with default settings for most of the options provided.
+
+**Table 3**
+
+> Decision Tree with rpart Method in Caret :
+
+```{r}
+library(rpart)
+library(caret)
+set.seed(20210316)
+
+tree_02 <- train(CLASS~., data = df_prep, method = "rpart")
+
+tree_02
+```
+
+Points of attention:
+
+-   splitting in training and test data is done by the functions within caret; caret uses 25 times repeated bootstrapping as default method to estimate the performance of the generated model
+
+-   caret uses a tuning parameter (cp, complexity parameter) to decide about tree depth; for more information see: ….. ; three different values are tested, for the final model the value with the best performance is used; so actually the total number of decision trees generated equals 75, 25 for each value of the tuning parameter
+
+#### 5.2.0.3 Plotting the decision tree
+
+Trees created with the caret package cannot be plotted with the rpart.plot() function. Use rattle::fancyRpartPlot() instead.
+
+```{r}
+library(rattle)
+
+fancyRpartPlot(tree_02$finalModel, sub = NULL)
+```
+
+> The tree created with the defaults of caret is a pruned version of the tree created with the default settings of rpart. It is possible to create a less pruned tree in caret by tuning the hyper parameters. Rpart also offers options to tune the training process.\
+> In general, it is good practice to start with the default settings and, after some experience, go deeper into model tuning
+
+#### 5.2.0.4 Model tuning in caret
+
+> The strength of the caret package lies in the diversity of ML models that are built into this package and the possibilities to tune the model. To learn and understand the concepts behind an ML model, it is better to use a package developed for the specific ML model. E.g. use rpart (or tree) to better understand the concepts of buidling a decison tree model.
+
+```{r}
+library(rattle)
+trctrl <- trainControl(method = "cv", #cross validation
+                       number = 10)   #10-fold cross validation
+cp_grid <- data.frame(cp = seq(0.02, .2, .02))
+
+tree_03 <- train(CLASS~., data = df_prep, method = 'rpart',
+                 trControl = trctrl,      
+                 tuneGrid = cp_grid)
+
+tree_03
+```
+
+```{r}
+library(tidyverse)
+library(openxlsx)
+library(kableExtra)
+library(flextable)
+library(lubridate)
+library(ISLR) #Smarket data set
+library(class) #knn function
+library(caret)
+#options(scipen = 999)
+```
+
+# Chapter 6 KNN Algorithm
+
+The KNN, K Nearest Neighbours, algorithm is an algorithm that can be used for both unsupervised and supervised learning. It can be used in a regression and in a classification context.
+
+## 6.1 KNN in Classification
+
+The idea behind the KNN algorithm is simple. Suppose a binary classification problem, i.e. the dataset provides a couple of features and a binary target Y-variable. The dataset contains hostorical data.\
+To predict the value of the target variable for a new observation, based on the values of the features, the distance of the new observation to the observations in the data set is calculated. The K observatioons wtih the lowest distance are filtered. The majority Y-value for these K observations is used as the predicted Y-value for the new observation.
+
+### 6.1.1 Choosing appropriate K value
+
+There is no general rule for the choice of the best K-value. It is most common to divide the data in a training an a test set, test a number of choices for K and check which choice leads to the best result.
+
+### 6.1.2 Distance metrics
+
+Commonly used distance metrics are (1) Eucledian distance and (2) Manhattan distance. Be aware that there are lots of other distance metrics as well.
+
+```{r}
+df <- read_csv("C:/Users/Karsaya/Desktop/UCI_Credit_Card.csv")
+```
+
+Predicting diabetes\
+Data set: [example from UCI website](https://archive.ics.uci.edu/ml/datasets/Early+stage+diabetes+risk+prediction+dataset.)
+
+The data set consists of 520 observations on 17 features. The target variable is the Class variable which can take on two values, Positive and Negative. All but one of the features are binary. The non binary feature is the Age feature.
+
+**Table 1**\
+First Six Observations of the Diabetes Data Set
+
+```{r}
+flextable(head(df)) %>% 
+  fontsize(size = 7, part = "all")
+```
+
+> Summary of Data :
+
+```{r}
+summary(df)
+```
+
+#### Data cleaning and Preprocessing
+
+Correct variable names (no spaces)\
+Preprocessing: normalize Age variable\
+Transform other variables into dummies\
+Transform class variable into a factor variable, this is a requirement for the caret::knn3() function\
+Split data set in training and test set; 70% in training, 30% in test set
+
+```{r}
+names(df) <- make.names(names(df)) %>% 
+  toupper() %>% str_replace_all("[\\.]", "_")
+
+
+df_prep <- df %>% 
+  mutate(AGE_NORM = (AGE - min(AGE))/(max(AGE)-min(AGE))) %>% 
+  select(AGE_NORM, everything(), -AGE) %>% 
+  mutate(GENDER = ifelse(GENDER=="Male", 1, 0))
+
+#variables in column 3-16 are all variables which only take on "Yes" or "No" values; these can be transformed into 0/1 variable with one line of code
+df_prep[,3:16] <- apply(df_prep[,3:16], 2, function(x) ifelse(x=="Yes", 1, 0))
+
+#transform CLASS variable into type factor variable
+df_prep$CLASS <- factor(df_prep$CLASS, levels = c("Positive", "Negative"),
+                        labels = c("POS", "NEG"))
+
+#split in training end test set
+set.seed(20210309)
+train <- sample(1:nrow(df), size = .7*nrow(df))
+df_train <- df_prep[train,]
+df_test <- df_prep[-train,]
+```
+
+```{r}
+#generate model using class::knn3() function
+#forst attempt with k=5 as an arbitrary choice
+knn_model_1 <- knn3(CLASS~., data = df_train, k = 5)
+knn_model_1
+```
+
+> Assess model\
+> Choose metric to assess model: Accuracy\
+> Use model to make predictions for test data\
+> Calculate Accuracy
+
+```{r}
+#make predcitions with the generated model
+knn_model_1_preds <- predict(knn_model_1, newdata = df_test, type = 'class')
+
+#construct a confusion matrix
+cf_1 <- table(knn_model_1_preds, df_test$CLASS)
+
+#calculate Accuracy
+acc_1 <- (cf_1[1,1] + cf_1[2,2]) / sum(cf_1)
+```
+
+> Table 3 : Confusion Matrix knn_1 model on Test Data set
+
+```{r}
+cf_1
+```
+
+```{r}
+data <- read_csv("C:/Users/Karsaya/Desktop/UCI_Credit_Card.csv")
+data <- data[-1,]
+```
+
+#### 6.1.2.1 Example 1: Predicting stockmarket going up or down
+
+Dataset: ISLR:: Smarket.\
+See ?ISLR::Smarket for more information.\
+Responsive variable: Direction; two possible values: “Up”, “Down”.\
+Predictors: Lag1, Lag2, Lag3, Lag4, Lag5.\
+Choices made:\
+- distance metric: eucledian distance\
+- k: comparing different values to find the optimal value\
+- model assessment metric: accuracy
+
+```{r}
+df <- ISLR::Smarket
+#data from 2001 to 2004 as training data
+#data from 2005 as test data
+df_train <- filter(df, Year < 2005) %>% 
+  select(Lag1, Lag2, Lag3, Lag4, Lag5, Direction)
+df_test <- filter(df, Year == 2005) %>% 
+  select(Lag1, Lag2, Lag3, Lag4, Lag5, Direction)
+
+# model 1: k = 1
+model_k1 <- knn(train = df_train[, 1:5],
+                test = df_test[, 1:5],
+                cl = df_train[, 6],
+                k = 1)
+table(model_k1, df_test$Direction)
+```
+
+```{r}
+acc_k1 <- round(sum(model_k1 == df_test$Direction)/nrow(df_test), 1)
+
+# accuracy for various k values
+
+accuracies <- data.frame(K = 1:150, ACCURACY = NA)
+
+for (k in 1:150) {
+  model_knn <- knn(train = df_train[, 1:5],
+                test = df_test[, 1:5],
+                cl = df_train$Direction,
+                k = k)
+  accuracies[k, 2] <- round(sum(model_knn == df_test$Direction)/nrow(df_test), 3)
+}
+
+ggplot(accuracies, aes(x = K, y = ACCURACY)) +
+  geom_line() +
+  ylim(0.4, 0.65) +
+  theme_minimal()
+```
+
+```{r}
+knn_model_caret <- train(Direction~.,
+                         data = df[, c("Lag1", "Lag2", "Lag3", "Lag4", "Lag5", "Direction")],
+                         method = "knn",
+                         tuneGrid = data.frame(k = seq(1, 40, 2)))
+
+preds_caret <- predict(knn_model_caret, newdata = df_test)
+confusionMatrix(preds_caret, df_test$Direction)
+```
+
+```{r}
+library(tidyverse)
+library(openxlsx)
+library(flextable)
+library(lubridate)
+library(caret)
+library(tm)
+library(e1071)
+#options(scipen = 999)
+
+df_train <- tibble(Y = c("POS", "POS","POS" ,"POS" ,"POS",
+                         "POS", "NEG","NEG", "NEG", "NEG"),
+                   X1 = c(1,1,1,1,0,0,1,0,0,0))
+
+df_train_2 <- tibble(Y = c("POS", "POS","POS" ,"POS" ,"POS",
+                         "POS", "NEG","NEG", "NEG", "NEG"),
+                     X1 = c(1,1,1,1,0,0,1,0,0,0),
+                     X2 = c(1,0,1,0,1,0,1,0,1,0)) 
+```

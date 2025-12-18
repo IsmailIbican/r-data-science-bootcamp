@@ -1,0 +1,179 @@
+---
+title: "Basics Of R"
+subtitle: "Introduction of R "
+author: "Ismail Ibican"
+date: "last-modified"
+date-format: "DD MMMM YYYY"
+description: "This document explains the basic concepts and functions of R programming."
+
+format:
+  html:
+    lang: en
+    embed-resources: true   
+    smooth-scroll: true     
+    link-external-newwindow: true 
+    theme:
+      light: zephyr   
+      dark: darkly   
+    toc: true
+    toc-location: left
+    toc-title: "Table of Contents"
+    toc-depth: 3
+    toc-expand: true   
+    number-sections: true  
+    code-fold: true
+    code-summary: "Show/Hide Code"
+    code-copy: true
+    code-overflow: scroll
+    grid:
+      body-width: 1000px
+      margin-width: 300px
+    callout-appearance: minimal 
+---
+
+```{r}
+"Hello World ! "
+```
+
+> There is one way to print something else
+
+```{r}
+print("Hello World!")
+```
+
+### Setting and getting working directory
+
+```{r}
+#getwd()
+#setwd()
+```
+
+### Basics : The class in a nutshell - Everything we'll do comes down to applying functions to adata
+
+# Operations
+
+```{r}
+x <- 7 + 5 # Addition
+```
+
+```{r}
+7 - 5 # Substraction
+```
+
+> It goes like that.
+
+```{r}
+exp(1)
+```
+
+```{r}
+cos(3.14593)
+```
+
+```{r}
+log2(1)
+```
+
+# Types
+
+```{r}
+typeof(7)
+# Output "double"
+```
+
+```{r}
+is.numeric(7)
+
+# Output : TRUE
+```
+
+```{r}
+is.na(7)
+
+# Output : FALSE
+```
+
+```{r}
+is.character(7)
+
+# Output : FALSE
+```
+
+### Variables We can give names to data objects; these give us variables. A few variables are built in
+
+```{r}
+pi
+```
+
+```{r}
+letters
+```
+
+> Months in English
+
+```{r}
+month.abb
+```
+
+```{r}
+month.name
+```
+
+> To find every variable in the document we use ls() function
+
+```{r}
+ls()
+```
+
+> Removing variables :
+
+```{r}
+rm("x")
+ls()
+```
+
+> Vectors are just able to hold same type of variables or data
+>
+> And also it's a first data structre type that we will use in R
+
+```{r}
+y <- c(1:10)
+y
+
+# Seperating vector with a colon that means take all numbers from 1 to 10 both interval is included to output
+```
+
+```{r}
+y ^ y
+```
+
+```{r}
+dim(x) <- c(2,5)
+x <- c("Hello", "World","!")
+x
+```
+
+> dim() function is a built in function that turns parameter vector to a matrix.
+>
+> In this example dim() function turns x vector to a matrix that have 2 rows and 5 columns
+
+### Usage of rep() and seq() functions
+
+```{r}
+Example1 <- seq(2:50)
+
+# That means there will be 2 rows and 50 number
+```
+
+```{r}
+Example1 <- seq(1,9, by=2)
+Example1 
+
+# Take the numbers from 1 to 9 with steps 2
+```
+
+```{r}
+Example1 <- rep(1:2, c(10,15))
+
+# This rep function says that take 1 to 2 and repeat them in order to vector
+```
